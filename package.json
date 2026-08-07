@@ -1,0 +1,18 @@
+{
+  "name": "astro-toc-smol",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Astro integration: generates TOC HTML from final rendered page at build time",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "keywords": ["astro", "astro-component", "toc", "table-of-contents"],
+  "license": "MIT",
+  "dependencies": {
+    "node-html-parser": "^6.1.13"
+  },
+  "peerDependencies": {
+    "astro": ">=4.0.0"
+  }
+}

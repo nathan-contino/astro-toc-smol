@@ -1,0 +1,212 @@
+/**
+ * astro-toc — generates table-of-contents HTML from the final rendered page.
+ *
+ * Usage:
+ *   1. Add to astro.config.ts:
+ *        import astroToc from 'astro-toc';
+ *        integrations: [astroToc()]
+ *
+ *   2. In any page's frontmatter add:
+ *        serverToc: true
+ *
+ *   3. The layout/TOC component must render a placeholder:
+ *        <nav id="toc-container" data-server-toc data-max-depth="4"></nav>
+ *      (TOC.astro handles this automatically when serverToc={true})
+ *
+ * Options:
+ *   articleSelector  - CSS selector(s) for the content area to scan.
+ *                      Tried in order; falls back to the full document.
+ *                      Default: ['article.fusion-article section',
+ *                                'article.fusion-article', 'article', 'main']
+ */
+
+import { parse } from 'node-html-parser';
+
+// ---------------------------------------------------------------------------
+// HTML escaping
+// ---------------------------------------------------------------------------
+
+function esc(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// ---------------------------------------------------------------------------
+// TOC HTML builder — mirrors the clientToc buildTOC() logic in TOC.astro
+// ---------------------------------------------------------------------------
+
+/**
+ * @param {Array<{id, text, depth, isApi, method}>} headings  flat ordered list
+ * @param {number} minDepth  shallowest depth present in the list
+ * @param {number} maxDepth  deepest depth to include
+ */
+function buildTocHtml(headings, minDepth, maxDepth) {
+  if (!headings.length) return '';
+
+  /**
+   * @param {Array} toc  slice of the heading list for the current branch
+   * @param {number} depth  heading depth being processed at this level
+   */
+  function buildLevel(toc, depth) {
+    if (depth > maxDepth) return '';
+
+    const levelItems = toc.filter(h => h.depth === depth);
+    if (!levelItems.length) return '';
+
+    const isTop = depth === minDepth;
+    const classes = isTop ? 'space-y-3 pt-5' : 'space-y-3 ml-4 pt-3';
+    const idAttr = isTop ? ' id="toc-list"' : '';
+    let html = `<ul${idAttr} class="${classes}" data-widget="scroll-spy">`;
+
+    for (let i = 0; i < levelItems.length; i++) {
+      const h = levelItems[i];
+      const next = levelItems[i + 1];
+
+      const start = toc.findIndex(x => x.id === h.id) + 1;
+      const end = next ? toc.findIndex(x => x.id === next.id) : toc.length;
+      const children = toc.slice(start, end);
+
+      html += '<li><div class="group" data-widget="scroll-spy-item">';
+
+      if (h.isApi) {
+        html += `<a href="#${esc(h.id)}" class="block font-mono text-xs text-slate-600 dark:text-slate-400 dark:group-[.active]:text-indigo-400 dark:hover:text-slate-100 group-[.active]:text-indigo-600 hover:text-slate-900 transition-colors break-all">`;
+        html += `<span class="font-bold pr-1.5 uppercase text-[10px] text-yellow-600 dark:text-yellow-400">${esc(h.method || '')}</span>`;
+        html += `<span>${esc(h.text)}</span></a>`;
+      } else {
+        html += `<a href="#${esc(h.id)}" class="block font-medium text-slate-600 text-sm dark:text-slate-400 dark:group-[.active]:text-indigo-400 dark:hover:text-slate-100 group-[.active]:text-indigo-600 hover:text-slate-900 transition-colors">${esc(h.text)}</a>`;
+      }
+
+      html += '</div>';
+      if (children.length) html += buildLevel(children, depth + 1);
+      html += '</li>';
+    }
+
+    html += '</ul>';
+    return html;
+  }
+
+  return buildLevel(headings, minDepth);
+}
+
+// ---------------------------------------------------------------------------
+// Heading extraction
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract ordered headings from a parsed HTML root, scoped to the article.
+ * Mirrors the rawHeadings extraction logic in the clientToc script.
+ */
+function extractHeadings(root, articleSelectors, maxDepth) {
+  let article = null;
+  for (const sel of articleSelectors) {
+    article = root.querySelector(sel);
+    if (article) break;
+  }
+  // Fallback: scan the whole document (noisy but better than nothing)
+  if (!article) article = root;
+
+  const els = article.querySelectorAll('h2, h3, h4, h5, h6, [data-toc-type="api"]');
+
+  let lastDepth = 2;
+  const headings = [];
+
+  for (const el of els) {
+    const isApi = el.hasAttribute('data-toc-type');
+    const id = el.getAttribute('id');
+    if (!id) continue;
+
+    let depth;
+    if (isApi) {
+      depth = lastDepth;
+    } else {
+      depth = parseInt(el.tagName[1], 10);
+      lastDepth = depth;
+    }
+
+    if (depth > maxDepth) continue;
+
+    // Strip the trailing "#" appended by rehype-autolink-headings
+    const text = isApi
+      ? (el.getAttribute('data-toc-text') || '')
+      : el.text.replace(/#/g, '').trim();
+
+    if (!text) continue;
+
+    headings.push({
+      id,
+      text,
+      depth,
+      isApi,
+      method: isApi ? el.getAttribute('data-toc-method') : null,
+    });
+  }
+
+  return headings;
+}
+
+// ---------------------------------------------------------------------------
+// Vite plugin
+// ---------------------------------------------------------------------------
+
+function viteAstroToc(opts) {
+  const articleSelectors = opts.articleSelector
+    ? (Array.isArray(opts.articleSelector) ? opts.articleSelector : [opts.articleSelector])
+    : [
+        'article.fusion-article section',
+        'article.fusion-article',
+        'article',
+        'main',
+      ];
+
+  return {
+    name: 'astro-toc',
+
+    transformIndexHtml(html) {
+      // Fast bail-out — avoids parsing every page
+      if (!html.includes('data-server-toc')) return;
+
+      try {
+        const root = parse(html);
+        const placeholder = root.querySelector('nav[data-server-toc]');
+        if (!placeholder) return;
+
+        const maxDepth = parseInt(placeholder.getAttribute('data-max-depth') || '4', 10);
+        const headings = extractHeadings(root, articleSelectors, maxDepth);
+        if (!headings.length) return;
+
+        const minDepth = Math.min(...headings.map(h => h.depth));
+        const tocHtml = buildTocHtml(headings, minDepth, maxDepth);
+
+        placeholder.removeAttribute('data-server-toc');
+        placeholder.removeAttribute('data-max-depth');
+        placeholder.set_content(tocHtml);
+
+        return root.toString();
+      } catch (err) {
+        console.warn(`[astro-toc] Failed to process HTML: ${err.message}`);
+      }
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Astro integration
+// ---------------------------------------------------------------------------
+
+export default function astroToc(opts = {}) {
+  return {
+    name: 'astro-toc',
+    hooks: {
+      'astro:config:setup': ({ updateConfig }) => {
+        updateConfig({
+          vite: {
+            plugins: [viteAstroToc(opts)],
+          },
+        });
+      },
+    },
+  };
+}
