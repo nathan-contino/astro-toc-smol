@@ -205,7 +205,8 @@ function extractHeadings(root, articleSelectors, maxDepth) {
   // Fallback: scan the whole document (noisy but better than nothing)
   if (!article) article = root;
 
-  const els = article.querySelectorAll('h2, h3, h4, h5, h6, [data-toc-type="api"]');
+  const els = article.querySelectorAll('h2, h3, h4, h5, h6, [data-toc-type="api"]')
+    .filter(el => !el.closest('[data-toc-ignore]'));
 
   // Assign IDs to any heading that doesn't have one yet
   assignMissingIds(els);
