@@ -57,7 +57,7 @@ function buildTocHtml(headings, minDepth, maxDepth) {
     if (!levelItems.length) return '';
 
     const isTop = depth === minDepth;
-    const classes = isTop ? 'space-y-3 pt-5' : 'space-y-3 ml-4 pt-3';
+    const classes = isTop ? 'space-y-4 pt-6' : 'space-y-3 ml-4 pt-4';
     const idAttr = isTop ? ' id="toc-list"' : '';
     let html = `<ul${idAttr} class="${classes}" data-widget="scroll-spy">`;
 
@@ -72,11 +72,11 @@ function buildTocHtml(headings, minDepth, maxDepth) {
       html += '<li><div class="group" data-widget="scroll-spy-item">';
 
       if (h.isApi) {
-        html += `<a href="#${esc(h.id)}" class="block font-mono text-xs text-slate-600 dark:text-slate-400 dark:group-[.active]:text-indigo-400 dark:hover:text-slate-100 group-[.active]:text-indigo-600 hover:text-slate-900 transition-colors break-all">`;
+        html += `<a href="#${esc(h.id)}" class="block font-mono text-xs text-slate-600 dark:text-slate-400 dark:group-[.active]:text-indigo-400 dark:hover:!text-slate-100 group-[.active]:text-indigo-600 hover:text-slate-800 transition-colors break-all">`;
         html += `<span class="font-bold pr-1.5 uppercase text-[10px] text-yellow-600 dark:text-yellow-400">${esc(h.method || '')}</span>`;
         html += `<span>${esc(h.text)}</span></a>`;
       } else {
-        html += `<a href="#${esc(h.id)}" class="block font-medium text-slate-600 text-sm dark:text-slate-400 dark:group-[.active]:text-indigo-400 dark:hover:text-slate-100 group-[.active]:text-indigo-600 hover:text-slate-900 transition-colors">${esc(h.text)}</a>`;
+        html += `<a href="#${esc(h.id)}" class="block font-medium text-slate-600 text-sm dark:text-slate-400 dark:group-[.active]:text-indigo-400 dark:hover:!text-slate-100 group-[.active]:text-indigo-600 hover:text-slate-800 transition-colors">${esc(h.text)}</a>`;
       }
 
       html += '</div>';
@@ -201,8 +201,8 @@ function extractHeadings(root, articleSelectors, maxDepth) {
 // Vite plugin
 // ---------------------------------------------------------------------------
 
-function viteAstroToc(opts) {
-  const articleSelectors = opts.articleSelector
+function resolveSelectors(opts) {
+  return opts.articleSelector
     ? (Array.isArray(opts.articleSelector) ? opts.articleSelector : [opts.articleSelector])
     : [
         'article.fusion-article section',
@@ -210,34 +210,41 @@ function viteAstroToc(opts) {
         'article',
         'main',
       ];
+}
 
+function processHtml(html, articleSelectors) {
+  if (!html.includes('data-server-toc')) return null;
+
+  try {
+    const root = parse(html);
+    const placeholder = root.querySelector('nav[data-server-toc]');
+    if (!placeholder) return null;
+
+    const maxDepth = parseInt(placeholder.getAttribute('data-max-depth') || '4', 10);
+    const headings = extractHeadings(root, articleSelectors, maxDepth);
+    if (!headings.length) return null;
+
+    const minDepth = Math.min(...headings.map(h => h.depth));
+    const tocHtml = buildTocHtml(headings, minDepth, maxDepth);
+
+    placeholder.removeAttribute('data-server-toc');
+    placeholder.removeAttribute('data-max-depth');
+    placeholder.set_content(tocHtml);
+
+    return root.toString();
+  } catch (err) {
+    console.warn(`[astro-toc] Failed to process HTML: ${err.message}`);
+    return null;
+  }
+}
+
+function viteAstroToc(articleSelectors) {
   return {
     name: 'astro-toc',
-
+    // Runs during `astro build` — Vite does NOT call this in dev mode for
+    // SSR-rendered pages, so dev mode is handled by the server middleware below.
     transformIndexHtml(html) {
-      // Fast bail-out — avoids parsing every page
-      if (!html.includes('data-server-toc')) return;
-
-      try {
-        const root = parse(html);
-        const placeholder = root.querySelector('nav[data-server-toc]');
-        if (!placeholder) return;
-
-        const maxDepth = parseInt(placeholder.getAttribute('data-max-depth') || '4', 10);
-        const headings = extractHeadings(root, articleSelectors, maxDepth);
-        if (!headings.length) return;
-
-        const minDepth = Math.min(...headings.map(h => h.depth));
-        const tocHtml = buildTocHtml(headings, minDepth, maxDepth);
-
-        placeholder.removeAttribute('data-server-toc');
-        placeholder.removeAttribute('data-max-depth');
-        placeholder.set_content(tocHtml);
-
-        return root.toString();
-      } catch (err) {
-        console.warn(`[astro-toc] Failed to process HTML: ${err.message}`);
-      }
+      return processHtml(html, articleSelectors) ?? undefined;
     },
   };
 }
@@ -247,14 +254,75 @@ function viteAstroToc(opts) {
 // ---------------------------------------------------------------------------
 
 export default function astroToc(opts = {}) {
+  const articleSelectors = resolveSelectors(opts);
+
   return {
     name: 'astro-toc',
     hooks: {
       'astro:config:setup': ({ updateConfig }) => {
         updateConfig({
           vite: {
-            plugins: [viteAstroToc(opts)],
+            plugins: [viteAstroToc(articleSelectors)],
           },
+        });
+      },
+
+      // Dev-mode support: Vite's transformIndexHtml is not called for Astro's
+      // SSR-rendered pages during `astro dev`.  We intercept each HTML response
+      // and apply the same transformation.
+      'astro:server:setup': ({ server }) => {
+        server.middlewares.use(function astroTocDev(req, res, next) {
+          // Skip Astro/Vite internal asset requests — they're never HTML pages.
+          const url = req.url || '';
+          if (
+            url.startsWith('/_astro/') ||
+            url.startsWith('/@') ||
+            /\.(js|ts|css|png|jpg|jpeg|gif|svg|woff2?|ico|json|xml)(\?|$)/i.test(url)
+          ) {
+            return next();
+          }
+
+          const chunks = [];
+          const origWrite = res.write.bind(res);
+          const origEnd = res.end.bind(res);
+
+          res.write = function (chunk, encoding) {
+            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, encoding || 'utf-8'));
+            return true;
+          };
+
+          res.end = function (chunk, encoding) {
+            // Restore originals immediately so error-handler re-entrant calls
+            // (e.g. Astro's handle500Response after a successful 200) hit the
+            // real functions, not our wrapper.
+            res.write = origWrite;
+            res.end = origEnd;
+
+            if (chunk) {
+              chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, encoding || 'utf-8'));
+            }
+
+            const html = Buffer.concat(chunks).toString('utf-8');
+
+            // Fast-bail for non-HTML and pages without a TOC placeholder.
+            if (html.trimStart().startsWith('<') && html.includes('data-server-toc')) {
+              const transformed = processHtml(html, articleSelectors);
+              if (transformed) {
+                const buf = Buffer.from(transformed, 'utf-8');
+                if (!res.headersSent) {
+                  res.setHeader('Content-Length', buf.length);
+                  res.removeHeader('Content-Encoding');
+                }
+                return origEnd(buf);
+              }
+            }
+
+            // No transformation — flush buffered content unchanged.
+            origWrite(Buffer.concat(chunks));
+            origEnd();
+          };
+
+          next();
         });
       },
     },
