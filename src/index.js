@@ -35,6 +35,22 @@ function esc(str) {
 }
 
 // ---------------------------------------------------------------------------
+// HTTP method → Tailwind color classes (matches API.astro methodColors)
+// ---------------------------------------------------------------------------
+
+const METHOD_COLORS = {
+  GET:    'text-blue-600 dark:text-blue-400',
+  POST:   'text-green-600 dark:text-green-400',
+  PUT:    'text-orange-600 dark:text-orange-400',
+  PATCH:  'text-teal-600 dark:text-teal-400',
+  DELETE: 'text-red-600 dark:text-red-400',
+};
+
+function methodColor(method) {
+  return METHOD_COLORS[(method || '').toUpperCase()] || 'text-yellow-600 dark:text-yellow-400';
+}
+
+// ---------------------------------------------------------------------------
 // TOC HTML builder — mirrors the clientToc buildTOC() logic in TOC.astro
 // ---------------------------------------------------------------------------
 
@@ -73,7 +89,7 @@ function buildTocHtml(headings, minDepth, maxDepth) {
 
       if (h.isApi) {
         html += `<a href="#${esc(h.id)}" class="block font-mono text-xs text-slate-600 dark:text-slate-400 dark:group-[.active]:text-indigo-400 dark:hover:!text-slate-100 group-[.active]:text-indigo-600 hover:text-slate-800 transition-colors break-all">`;
-        html += `<span class="font-bold pr-1.5 uppercase text-[10px] text-yellow-600 dark:text-yellow-400">${esc(h.method || '')}</span>`;
+        html += `<span class="font-bold pr-1.5 uppercase text-[10px] ${methodColor(h.method)}">${esc(h.method || '')}</span>`;
         html += `<span>${esc(h.text)}</span></a>`;
       } else {
         html += `<a href="#${esc(h.id)}" class="block font-medium text-slate-600 text-sm dark:text-slate-400 dark:group-[.active]:text-indigo-400 dark:hover:!text-slate-100 group-[.active]:text-indigo-600 hover:text-slate-800 transition-colors">${esc(h.text)}</a>`;
