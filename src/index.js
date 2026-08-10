@@ -21,6 +21,19 @@
  */
 
 import { parse } from 'node-html-parser';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+function walkHtml(dir) {
+  const results = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) results.push(...walkHtml(full));
+    else if (entry.name.endsWith('.html')) results.push(full);
+  }
+  return results;
+}
 
 // ---------------------------------------------------------------------------
 // HTML escaping
@@ -89,8 +102,8 @@ function buildTocHtml(headings, minDepth, maxDepth) {
 
       if (h.isApi) {
         html += `<a href="#${esc(h.id)}" class="block font-mono text-xs text-slate-600 dark:text-slate-400 dark:group-[.active]:text-indigo-400 dark:hover:!text-slate-100 group-[.active]:text-indigo-600 hover:text-slate-800 transition-colors break-all">`;
-        html += `<span class="font-bold pr-1.5 uppercase text-[10px] ${methodColor(h.method)}">${esc(h.method || '')}</span>`;
-        html += `<span>${esc(h.text)}</span></a>`;
+        html += `<span class="font-bold pr-1 uppercase text-[10px] ${methodColor(h.method)}">${esc(h.method || '')}</span>`;
+        html += ` <span>${esc(h.text)}</span></a>`;
       } else {
         html += `<a href="#${esc(h.id)}" class="block font-medium text-slate-600 text-sm dark:text-slate-400 dark:group-[.active]:text-indigo-400 dark:hover:!text-slate-100 group-[.active]:text-indigo-600 hover:text-slate-800 transition-colors">${esc(h.text)}</a>`;
       }
@@ -281,6 +294,23 @@ export default function astroToc(opts = {}) {
             plugins: [viteAstroToc(articleSelectors)],
           },
         });
+      },
+
+      // Build-time support: transformIndexHtml is only called for Vite's own
+      // HTML entry points, NOT for Astro's SSG-generated pages.  We walk the
+      // dist directory after the build and apply the same transformation.
+      'astro:build:done': async ({ dir }) => {
+        const distDir = dir instanceof URL ? fileURLToPath(dir) : String(dir);
+        const files = walkHtml(distDir);
+        for (const file of files) {
+          try {
+            const html = fs.readFileSync(file, 'utf-8');
+            const transformed = processHtml(html, articleSelectors);
+            if (transformed) fs.writeFileSync(file, transformed, 'utf-8');
+          } catch (err) {
+            console.warn(`[astro-toc] build:done failed for ${file}: ${err.message}`);
+          }
+        }
       },
 
       // Dev-mode support: Vite's transformIndexHtml is not called for Astro's
