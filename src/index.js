@@ -134,36 +134,57 @@ function slugify(text) {
 }
 
 /**
- * Assign IDs to every heading in `els` that lacks one.
- * Pre-seeds the dedup map with existing IDs so generated slugs never collide.
+ * Assign IDs to every heading in `els` that lacks one, and deduplicate any
+ * headings that share an existing ID (e.g. MDX partials processed independently
+ * by rehype-slug that each emit the same id="request-body").
  * Mutates the element's `id` attribute in the parsed HTML tree.
  */
 function assignMissingIds(els) {
-  // seen tracks how many times each base slug has been used
-  const seen = Object.create(null);
-
-  // Pass 1: register all existing IDs so we don't collide with them
+  // Pass 1: count how many times each ID appears in the DOM
+  const idCount = Object.create(null);
   for (const el of els) {
     const id = el.getAttribute('id');
-    if (id) seen[id] = (seen[id] || 0) + 1;
+    if (id) idCount[id] = (idCount[id] || 0) + 1;
   }
 
-  // Pass 2: generate IDs for headings that don't have one
+  // allIds tracks every ID that will exist in the final HTML (for collision avoidance)
+  const allIds = new Set(Object.keys(idCount));
+
+  function claimId(base) {
+    if (!allIds.has(base)) { allIds.add(base); return base; }
+    let n = 1;
+    while (allIds.has(`${base}-${n}`)) n++;
+    const id = `${base}-${n}`;
+    allIds.add(id);
+    return id;
+  }
+
+  // Pass 2a: deduplicate elements that share an existing ID (second+ occurrence gets a new unique id)
+  // Pass 2b: assign IDs to elements that have none
+  const dupSeen = Object.create(null); // how many times we've already processed each duplicate base
+
   for (const el of els) {
-    if (el.getAttribute('id')) continue;
     if (el.hasAttribute('data-toc-type')) continue; // API markers always have explicit ids
 
-    const text = el.text.replace(/#/g, '').trim();
-    if (!text) continue;
-
-    const base = slugify(text);
-    if (!base) continue;
-
-    const n = seen[base] || 0;
-    seen[base] = n + 1;
-    const id = n === 0 ? base : `${base}-${n}`;
-
-    el.setAttribute('id', id);
+    const existingId = el.getAttribute('id');
+    if (existingId) {
+      if (idCount[existingId] <= 1) continue; // unique — keep as-is
+      // Duplicate: first occurrence keeps original, subsequent get new unique ids
+      const n = dupSeen[existingId] || 0;
+      dupSeen[existingId] = n + 1;
+      if (n === 0) continue; // first occurrence — original id is already in allIds
+      let counter = n;
+      while (allIds.has(`${existingId}-${counter}`)) counter++;
+      const newId = `${existingId}-${counter}`;
+      allIds.add(newId);
+      el.setAttribute('id', newId);
+    } else {
+      const text = el.text.replace(/#/g, '').trim();
+      if (!text) continue;
+      const base = slugify(text);
+      if (!base) continue;
+      el.setAttribute('id', claimId(base));
+    }
   }
 }
 
