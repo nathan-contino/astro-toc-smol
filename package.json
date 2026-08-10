@@ -1,6 +1,6 @@
 {
   "name": "astro-toc-smol",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "description": "Astro integration: generates TOC HTML from final rendered page at build time",
   "main": "./src/index.js",
