@@ -92,6 +92,53 @@ function buildTocHtml(headings, minDepth, maxDepth) {
 }
 
 // ---------------------------------------------------------------------------
+// Auto-ID generation for headings that bypass rehype-slug
+// (i.e. headings inside .astro components)
+// ---------------------------------------------------------------------------
+
+function slugify(text) {
+  return text
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s_]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/**
+ * Assign IDs to every heading in `els` that lacks one.
+ * Pre-seeds the dedup map with existing IDs so generated slugs never collide.
+ * Mutates the element's `id` attribute in the parsed HTML tree.
+ */
+function assignMissingIds(els) {
+  // seen tracks how many times each base slug has been used
+  const seen = Object.create(null);
+
+  // Pass 1: register all existing IDs so we don't collide with them
+  for (const el of els) {
+    const id = el.getAttribute('id');
+    if (id) seen[id] = (seen[id] || 0) + 1;
+  }
+
+  // Pass 2: generate IDs for headings that don't have one
+  for (const el of els) {
+    if (el.getAttribute('id')) continue;
+    if (el.hasAttribute('data-toc-type')) continue; // API markers always have explicit ids
+
+    const text = el.text.replace(/#/g, '').trim();
+    if (!text) continue;
+
+    const base = slugify(text);
+    if (!base) continue;
+
+    const n = seen[base] || 0;
+    seen[base] = n + 1;
+    const id = n === 0 ? base : `${base}-${n}`;
+
+    el.setAttribute('id', id);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Heading extraction
 // ---------------------------------------------------------------------------
 
@@ -109,6 +156,9 @@ function extractHeadings(root, articleSelectors, maxDepth) {
   if (!article) article = root;
 
   const els = article.querySelectorAll('h2, h3, h4, h5, h6, [data-toc-type="api"]');
+
+  // Assign IDs to any heading that doesn't have one yet
+  assignMissingIds(els);
 
   let lastDepth = 2;
   const headings = [];
