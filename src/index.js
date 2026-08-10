@@ -86,7 +86,7 @@ function buildTocHtml(headings, minDepth, maxDepth) {
     if (!levelItems.length) return '';
 
     const isTop = depth === minDepth;
-    const classes = isTop ? 'space-y-4 pt-6' : 'space-y-3 ml-4 pt-4';
+    const classes = isTop ? 'space-y-3 pt-4' : 'space-y-2 ml-4 pt-2';
     const idAttr = isTop ? ' id="toc-list"' : '';
     let html = `<ul${idAttr} class="${classes}" data-widget="scroll-spy">`;
 
