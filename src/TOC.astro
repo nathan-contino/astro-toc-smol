@@ -1,0 +1,75 @@
+---
+interface Props {
+  maxDepth?: number;
+  class?: string;
+}
+const { maxDepth = 4, class: className } = Astro.props;
+---
+
+<nav id="toc-container" data-server-toc data-max-depth={maxDepth} class={className}></nav>
+
+<script>
+  // Hide the nearest [data-toc-aside] ancestor if the TOC is empty.
+  document.addEventListener('DOMContentLoaded', () => {
+    const container = document.getElementById('toc-container');
+    if (!container || !container.firstElementChild) {
+      const aside = container?.closest('[data-toc-aside]') as HTMLElement | null;
+      if (aside) aside.hidden = true;
+    }
+  });
+
+  // Scroll spy: highlights the TOC entry for the heading closest to the viewport top.
+  function throttle(fn: (...args: unknown[]) => void, ms: number) {
+    let last = 0;
+    return (...args: unknown[]) => {
+      const now = Date.now();
+      if (now - last >= ms) { last = now; fn(...args); }
+    };
+  }
+
+  const SHIFT = 100;
+  let headers: HTMLElement[] = [];
+
+  const handleScroll = () => {
+    if (!headers.length) return;
+
+    const scroll = document.documentElement.scrollTop;
+    const active = headers.findLast(h => scroll + SHIFT > h.offsetTop) ?? headers[0];
+
+    const link = document.querySelector<HTMLElement>(
+      `[data-widget="scroll-spy"] a[href="#${CSS.escape(active.id)}"]`
+    );
+    if (!link) return;
+
+    document.querySelectorAll('[data-widget="scroll-spy"] [data-widget="scroll-spy-item"].active')
+      .forEach(el => el.classList.remove('active'));
+
+    const item = link.closest('[data-widget="scroll-spy-item"]');
+    if (!item) return;
+    item.classList.add('active');
+
+    // Scroll the TOC sidebar to keep the active item visible without touching the page scroll.
+    const toc = document.getElementById('toc-container');
+    if (toc && toc.scrollHeight > toc.clientHeight) {
+      const tocRect = toc.getBoundingClientRect();
+      const itemRect = (item as HTMLElement).getBoundingClientRect();
+      if (itemRect.top < tocRect.top) toc.scrollTop += itemRect.top - tocRect.top;
+      else if (itemRect.bottom > tocRect.bottom) toc.scrollTop += itemRect.bottom - tocRect.bottom;
+    }
+  };
+
+  const register = () => {
+    headers = [...document.querySelectorAll<HTMLElement>(
+      'h2[id], h3[id], h4[id], [data-toc-type="api"][id]'
+    )].sort((a, b) => a.offsetTop - b.offsetTop);
+
+    handleScroll();
+    document.addEventListener('scroll', throttle(handleScroll, 50));
+  };
+
+  document.addEventListener('DOMContentLoaded', () => {
+    if (!document.querySelector('[data-widget="scroll-spy"]')) return;
+    if (window.requestIdleCallback) window.requestIdleCallback(register);
+    else setTimeout(register, 0);
+  });
+</script>

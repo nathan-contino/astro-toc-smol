@@ -1,23 +1,12 @@
 /**
- * astro-toc — generates table-of-contents HTML from the final rendered page.
+ * astro-toc-smol — generates "On This Page" TOC HTML from the final rendered page.
  *
- * Usage:
- *   1. Add to astro.config.ts:
- *        import astroToc from 'astro-toc';
- *        integrations: [astroToc()]
- *
- *   2. In any page's frontmatter add:
- *        serverToc: true
- *
- *   3. The layout/TOC component must render a placeholder:
- *        <nav id="toc-container" data-server-toc data-max-depth="4"></nav>
- *      (TOC.astro handles this automatically when serverToc={true})
+ * See README for full setup instructions.
  *
  * Options:
- *   articleSelector  - CSS selector(s) for the content area to scan.
+ *   articleSelector  - CSS selector(s) for the content area to scan for headings.
  *                      Tried in order; falls back to the full document.
- *                      Default: ['article.fusion-article section',
- *                                'article.fusion-article', 'article', 'main']
+ *                      Default: ['article', 'main']
  */
 
 import { parse } from 'node-html-parser';
@@ -221,7 +210,7 @@ function extractHeadings(root, articleSelectors, maxDepth) {
 
     let depth;
     if (isApi) {
-      depth = lastDepth;
+      depth = lastDepth + 1; // nest API anchors as children of their enclosing heading
     } else {
       depth = parseInt(el.tagName[1], 10);
       lastDepth = depth;
@@ -255,12 +244,7 @@ function extractHeadings(root, articleSelectors, maxDepth) {
 function resolveSelectors(opts) {
   return opts.articleSelector
     ? (Array.isArray(opts.articleSelector) ? opts.articleSelector : [opts.articleSelector])
-    : [
-        'article.fusion-article section',
-        'article.fusion-article',
-        'article',
-        'main',
-      ];
+    : ['article', 'main'];
 }
 
 function processHtml(html, articleSelectors) {
@@ -303,6 +287,8 @@ function viteAstroToc(articleSelectors) {
 // ---------------------------------------------------------------------------
 // Astro integration
 // ---------------------------------------------------------------------------
+
+export { processHtml };
 
 export default function astroToc(opts = {}) {
   const articleSelectors = resolveSelectors(opts);
