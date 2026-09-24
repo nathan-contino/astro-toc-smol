@@ -1,13 +1,19 @@
 {
   "name": "astro-toc-smol",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "type": "module",
   "description": "Astro integration + component for a full server-side 'On This Page' TOC with scroll spy",
   "main": "./src/index.js",
   "exports": {
     ".": "./src/index.js",
-    "./TOC.astro": "./src/TOC.astro",
-    "./InlineTOC.astro": "./src/InlineTOC.astro"
+    "./TOC.astro": {
+      "import": "./src/TOC.astro",
+      "default": "./src/TOC.astro"
+    },
+    "./InlineTOC.astro": {
+      "import": "./src/InlineTOC.astro",
+      "default": "./src/InlineTOC.astro"
+    }
   },
   "keywords": ["astro", "astro-component", "astro-integration", "toc", "table-of-contents", "scroll-spy", "on-this-page"],
   "license": "MIT",
