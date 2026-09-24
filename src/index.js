@@ -252,19 +252,31 @@ function processHtml(html, articleSelectors) {
 
   try {
     const root = parse(html);
-    const placeholder = root.querySelector('nav[data-server-toc]');
-    if (!placeholder) return null;
+    const placeholders = root.querySelectorAll('nav[data-server-toc]');
+    if (!placeholders.length) return null;
 
-    const maxDepth = parseInt(placeholder.getAttribute('data-max-depth') || '4', 10);
+    // Use the first placeholder's maxDepth for heading extraction.
+    const maxDepth = parseInt(placeholders[0].getAttribute('data-max-depth') || '4', 10);
     const headings = extractHeadings(root, articleSelectors, maxDepth);
-    if (!headings.length) return null;
+
+    if (!headings.length) {
+      // No headings — hide any inline TOC details elements so they don't show empty.
+      let changed = false;
+      for (const el of root.querySelectorAll('[data-toc-inline]')) {
+        el.setAttribute('hidden', '');
+        changed = true;
+      }
+      return changed ? root.toString() : null;
+    }
 
     const minDepth = Math.min(...headings.map(h => h.depth));
     const tocHtml = buildTocHtml(headings, minDepth, maxDepth);
 
-    placeholder.removeAttribute('data-server-toc');
-    placeholder.removeAttribute('data-max-depth');
-    placeholder.set_content(tocHtml);
+    for (const placeholder of placeholders) {
+      placeholder.removeAttribute('data-server-toc');
+      placeholder.removeAttribute('data-max-depth');
+      placeholder.set_content(tocHtml);
+    }
 
     return root.toString();
   } catch (err) {

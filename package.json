@@ -6,7 +6,8 @@
   "main": "./src/index.js",
   "exports": {
     ".": "./src/index.js",
-    "./TOC.astro": "./src/TOC.astro"
+    "./TOC.astro": "./src/TOC.astro",
+    "./InlineTOC.astro": "./src/InlineTOC.astro"
   },
   "keywords": ["astro", "astro-component", "astro-integration", "toc", "table-of-contents", "scroll-spy", "on-this-page"],
   "license": "MIT",

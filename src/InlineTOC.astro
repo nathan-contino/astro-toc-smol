@@ -1,0 +1,27 @@
+---
+interface Props {
+  maxDepth?: number;
+}
+const { maxDepth = 4 } = Astro.props;
+---
+
+<details class="toc-inline not-prose" data-toc-inline data-markdown-ignore>
+  <summary class="toc-inline-summary">
+    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+    On this page
+  </summary>
+  <div class="toc-inline-body">
+    <nav data-server-toc data-max-depth={maxDepth}></nav>
+  </div>
+</details>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const inline = document.querySelector('[data-toc-inline]') as HTMLElement | null;
+    if (!inline) return;
+    const nav = inline.querySelector('nav');
+    if (!nav || !nav.firstElementChild) inline.hidden = true;
+  });
+</script>

@@ -36,12 +36,13 @@ const { maxDepth = 4, class: className } = Astro.props;
     const scroll = document.documentElement.scrollTop;
     const active = headers.findLast(h => scroll + SHIFT > h.offsetTop) ?? headers[0];
 
+    // scope to #toc-container so the mobile inline TOC doesn't interfere
     const link = document.querySelector<HTMLElement>(
-      `[data-widget="scroll-spy"] a[href="#${CSS.escape(active.id)}"]`
+      `#toc-container [data-widget="scroll-spy"] a[href="#${CSS.escape(active.id)}"]`
     );
     if (!link) return;
 
-    document.querySelectorAll('[data-widget="scroll-spy"] [data-widget="scroll-spy-item"].active')
+    document.querySelectorAll('#toc-container [data-widget="scroll-spy-item"].active')
       .forEach(el => el.classList.remove('active'));
 
     const item = link.closest('[data-widget="scroll-spy-item"]');
