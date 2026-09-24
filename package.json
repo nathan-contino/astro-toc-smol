@@ -1,6 +1,6 @@
 {
   "name": "astro-toc-smol",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "description": "Astro integration + component for a full server-side 'On This Page' TOC with scroll spy",
   "main": "./src/index.js",
