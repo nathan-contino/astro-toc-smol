@@ -1,4 +1,4 @@
-# astro-toc-smol
+# astro-better-toc
 
 Astro integration + component that generates a full **"On This Page"** table-of-contents, server-side, with active-link scroll spy at runtime.
 
@@ -7,7 +7,7 @@ TOC entries are built from the **final rendered HTML** rather than from MDX fron
 ## Installation
 
 ```sh
-npm install astro-toc-smol
+npm install astro-better-toc
 ```
 
 ## Setup
@@ -17,7 +17,7 @@ npm install astro-toc-smol
 ```ts
 // astro.config.ts
 import { defineConfig } from 'astro/config';
-import astroToc from 'astro-toc-smol';
+import astroToc from 'astro-better-toc';
 
 export default defineConfig({
   integrations: [astroToc()],
@@ -31,7 +31,7 @@ Place it inside an element with `data-toc-aside`. The component hides that ances
 ```astro
 ---
 // layouts/Base.astro
-import TOC from 'astro-toc-smol/TOC.astro';
+import TOC from 'astro-better-toc/TOC.astro';
 ---
 
 <aside data-toc-aside>

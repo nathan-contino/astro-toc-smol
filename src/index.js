@@ -1,5 +1,5 @@
 /**
- * astro-toc-smol — generates "On This Page" TOC HTML from the final rendered page.
+ * astro-better-toc — generates "On This Page" TOC HTML from the final rendered page.
  *
  * See README for full setup instructions.
  *

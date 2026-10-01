@@ -1,8 +1,27 @@
 {
-  "name": "astro-toc-smol",
+  "name": "astro-better-toc",
   "version": "1.1.2",
-  "type": "module",
   "description": "Astro integration + component for a full server-side 'On This Page' TOC with scroll spy",
+  "keywords": [
+    "astro",
+    "astro-component",
+    "astro-integration",
+    "toc",
+    "table-of-contents",
+    "scroll-spy",
+    "on-this-page"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/better-static-sites/better-static-sites.github.io.git",
+    "directory": "astro-better-toc"
+  },
+  "homepage": "https://better-static-sites.github.io",
+  "bugs": {
+    "url": "https://github.com/better-static-sites/better-static-sites.github.io/issues"
+  },
+  "type": "module",
   "main": "./src/index.js",
   "exports": {
     ".": "./src/index.js",
@@ -15,8 +34,11 @@
       "default": "./src/InlineTOC.astro"
     }
   },
-  "keywords": ["astro", "astro-component", "astro-integration", "toc", "table-of-contents", "scroll-spy", "on-this-page"],
-  "license": "MIT",
+  "files": [
+    "src/index.js",
+    "src/TOC.astro",
+    "src/InlineTOC.astro"
+  ],
   "scripts": {
     "test": "node --test src/index.test.js"
   },
