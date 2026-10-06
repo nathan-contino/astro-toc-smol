@@ -308,3 +308,30 @@ test('JWT section Request Headers link points to the JWT heading, not the first 
   assert.equal(rhLinks[0], '#request-headers', 'first link should be #request-headers');
   assert.notEqual(rhLinks[1], '#request-headers', `JWT link must not be #request-headers, got: ${rhLinks[1]}`);
 });
+
+// -------------------------------------------------------------------------
+// build:done: the worker pool writes the same output as processHtml
+// -------------------------------------------------------------------------
+
+test('build:done worker pool matches processHtml for every page', async () => {
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const { default: astroToc } = await import('./index.js');
+
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'toc-'));
+  const pages = [];
+  for (let i = 0; i < 80; i++) {
+    const html = i % 10 === 0
+      ? '<!DOCTYPE html><html><body><p>no toc placeholder</p></body></html>'
+      : wrap(`<h2>Intro ${i}</h2><h3 id="dup">A</h3><h3 id="dup">B</h3><h2>Outro</h2>`);
+    const file = path.join(dir, i % 2 ? `nested/p${i}.html` : `p${i}.html`);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, html);
+    pages.push({ file, expected: processHtml(html, ['article.fusion-article section', 'article']) ?? html });
+  }
+
+  await astroToc({ articleSelector: ['article.fusion-article section', 'article'] }).hooks['astro:build:done']({ dir: new URL(`file://${dir}/`) });
+
+  for (const { file, expected } of pages) assert.equal(fs.readFileSync(file, 'utf-8'), expected, file);
+});
